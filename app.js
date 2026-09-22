@@ -160,7 +160,9 @@ function renderTable(){
       <td><button class="editHint" onclick="alert('Edit or delete this record directly in the Google Sheet. The website will update automatically.')">Sheet</button></td>
     </tr>`).join("");
 
-  $("empty").style.display=rows.length?"none":"block";
+  // Never show "No matching records" while Google Sheet data is still loading.
+  // Show it only after a successful data load that genuinely returned zero matching rows.
+  $("empty").style.display=(!loading && rows.length===0)?"block":"none";
 }
 
 $("dynamicForm").addEventListener("submit",async e=>{
@@ -195,6 +197,7 @@ $("year").textContent=new Date().getFullYear();
 // 2) Fetch the latest Sheet data in the background.
 // 3) Keep old data if the Google service is temporarily slow.
 const hadCache=loadCache();
+loading=true;
 if(hadCache) buildUI(); else showLoading();
 loadData(false);
 
