@@ -73,31 +73,62 @@ async function fetchFreshData(){
   }
 }
 
+function captureFormState(){
+  const state={};
+  document.querySelectorAll('#dynamicForm input[data-header]').forEach(i=>{
+    state[i.dataset.header]=i.value;
+  });
+  const pin=$("adminPin");
+  if(pin) state.__PIN__=pin.value;
+  return state;
+}
+
+function restoreFormState(state){
+  if(!state) return;
+  document.querySelectorAll('#dynamicForm input[data-header]').forEach(i=>{
+    if(Object.prototype.hasOwnProperty.call(state,i.dataset.header)){
+      i.value=state[i.dataset.header];
+    }
+  });
+  const pin=$("adminPin");
+  if(pin && state.__PIN__!==undefined) pin.value=state.__PIN__;
+}
+
 async function loadData(silent=false){
   if(API_URL.startsWith("PASTE_")){
     const hasCache=loadCache();
     if(!hasCache){
       db={headers:["Name","Roll","Batch","Mobile Number","Blood Group","Available"],rows:[]};
     }
+    loading=false;
     buildUI();
     return;
   }
 
-  if(!silent && !loadCache()) showLoading();
-  else if(!silent && db.rows.length===0) showTemporaryError();
+  // Never destroy an in-progress Add Student form during background sync.
+  const formState = silent ? captureFormState() : null;
+
+  if(!silent && !loadCache()) {
+    loading=true;
+    showLoading();
+  } else if(!silent && db.rows.length===0) {
+    loading=true;
+    showTemporaryError();
+  }
 
   try{
     await fetchFreshData();
     loading=false;
     buildUI();
+    restoreFormState(formState);
   }catch(err){
     loading=false;
-    // IMPORTANT: Never erase working data when the network/API is slow.
+    // Keep working data and, importantly, keep any typed form values.
     if(db.rows.length>0){
       buildUI();
+      restoreFormState(formState);
     }else{
       showTemporaryError();
-      // Retry shortly without asking the user to refresh.
       setTimeout(()=>loadData(true),2500);
     }
   }
@@ -160,8 +191,6 @@ function renderTable(){
       <td><button class="editHint" onclick="alert('Edit or delete this record directly in the Google Sheet. The website will update automatically.')">Sheet</button></td>
     </tr>`).join("");
 
-  // Never show "No matching records" while Google Sheet data is still loading.
-  // Show it only after a successful data load that genuinely returned zero matching rows.
   $("empty").style.display=(!loading && rows.length===0)?"block":"none";
 }
 
@@ -197,7 +226,6 @@ $("year").textContent=new Date().getFullYear();
 // 2) Fetch the latest Sheet data in the background.
 // 3) Keep old data if the Google service is temporarily slow.
 const hadCache=loadCache();
-loading=true;
 if(hadCache) buildUI(); else showLoading();
 loadData(false);
 
