@@ -86,9 +86,7 @@ function captureFormState(){
 function restoreFormState(state){
   if(!state) return;
   document.querySelectorAll('#dynamicForm input[data-header]').forEach(i=>{
-    if(Object.prototype.hasOwnProperty.call(state,i.dataset.header)){
-      i.value=state[i.dataset.header];
-    }
+    if(Object.prototype.hasOwnProperty.call(state,i.dataset.header)) i.value=state[i.dataset.header];
   });
   const pin=$("adminPin");
   if(pin && state.__PIN__!==undefined) pin.value=state.__PIN__;
@@ -97,21 +95,19 @@ function restoreFormState(state){
 async function loadData(silent=false){
   if(API_URL.startsWith("PASTE_")){
     const hasCache=loadCache();
-    if(!hasCache){
-      db={headers:["Name","Roll","Batch","Mobile Number","Blood Group","Available"],rows:[]};
-    }
+    if(!hasCache) db={headers:["Name","Roll","Batch","Mobile Number","Blood Group","Available"],rows:[]};
     loading=false;
     buildUI();
     return;
   }
 
-  // Never destroy an in-progress Add Student form during background sync.
+  // Never destroy text entered in the Add Student form during background sync.
   const formState = silent ? captureFormState() : null;
 
-  if(!silent && !loadCache()) {
+  if(!silent && !loadCache()){
     loading=true;
     showLoading();
-  } else if(!silent && db.rows.length===0) {
+  }else if(!silent && db.rows.length===0){
     loading=true;
     showTemporaryError();
   }
@@ -123,13 +119,12 @@ async function loadData(silent=false){
     restoreFormState(formState);
   }catch(err){
     loading=false;
-    // Keep working data and, importantly, keep any typed form values.
     if(db.rows.length>0){
       buildUI();
       restoreFormState(formState);
     }else{
       showTemporaryError();
-      setTimeout(()=>loadData(true),2500);
+      setTimeout(()=>loadData(true),1500);
     }
   }
 }
@@ -199,20 +194,41 @@ $("dynamicForm").addEventListener("submit",async e=>{
   if(API_URL.startsWith("PASTE_")){ $("formMsg").textContent="Connect the Apps Script URL first."; return; }
 
   const fields={};
-  document.querySelectorAll('#dynamicForm input[data-header]').forEach(i=>fields[i.dataset.header]=i.value);
+  document.querySelectorAll('#dynamicForm input[data-header]').forEach(i=>fields[i.dataset.header]=i.value.trim());
   const pin=$("adminPin").value;
-  $("formMsg").textContent="Saving…";
+
+  // Optimistic UI: show the new record immediately, before waiting for Apps Script.
+  const headers=db.headers.filter(Boolean);
+  const optimisticRow={};
+  headers.forEach(h=>optimisticRow[h]=fields[h]??"");
+  db.rows=[optimisticRow,...db.rows];
+  saveCache();
+  loading=false;
+  buildUI();
+  $("formMsg").textContent="Added to the list — saving to Google Sheet…";
+
+  // Close immediately on mobile; the save continues in the background.
+  closeModal();
 
   try{
     const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({pin,fields})});
     const out=await res.json();
-    $("formMsg").textContent=out.message||(out.success?"Saved.":"Failed.");
-    if(out.success){
-      document.querySelectorAll('#dynamicForm input[data-header]').forEach(i=>i.value="");
-      $("adminPin").value="";
-      setTimeout(()=>{closeModal();loadData(true);},500);
+    if(!out.success){
+      // Remove only our optimistic row if server rejected it.
+      db.rows=db.rows.filter(r=>r!==optimisticRow);
+      saveCache();
+      buildUI();
+      alert(out.message||"Could not save to Google Sheet.");
+      return;
     }
-  }catch(err){ $("formMsg").textContent="Connection failed. Try again."; }
+    // Pull the authoritative Sheet data once after successful save.
+    await loadData(true);
+  }catch(err){
+    // Keep the optimistic record visible rather than deleting it because the
+    // network may have timed out after the Sheet actually saved the record.
+    saveCache();
+    console.warn("Background save check failed",err);
+  }
 });
 
 function openModal(){ $("modal").classList.remove("hide"); }
@@ -226,8 +242,15 @@ $("year").textContent=new Date().getFullYear();
 // 2) Fetch the latest Sheet data in the background.
 // 3) Keep old data if the Google service is temporarily slow.
 const hadCache=loadCache();
-if(hadCache) buildUI(); else showLoading();
-loadData(false);
+if(hadCache){
+  loading=false;
+  buildUI();
+  loadData(true);
+}else{
+  loading=true;
+  showLoading();
+  loadData(false);
+}
 
-// Automatic background sync every 30 seconds.
+// Automatic background sync every 30 seconds. It never clears the current UI.
 setInterval(()=>loadData(true),AUTO_SYNC_MS);
