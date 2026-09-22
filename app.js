@@ -18,7 +18,19 @@ function esc(value) {
 }
 function isMobileHeader(h){ return /mobile|phone|contact|telephone|cell/i.test(h); }
 function isBloodHeader(h){ return /blood/i.test(h); }
-function isAvailabilityHeader(h){ return /available|availability|status/i.test(h); }
+function isAvailabilityHeader(h){ return /available|availability/i.test(h); }
+function isBatchHeader(h){ return /batch/i.test(h); }
+function isLastDonatedHeader(h){ return /last\s*donat|donat.*date|^status$/i.test(h); }
+function displayHeader(h){ return /^status$/i.test(h) ? "Last Donated Date" : h; }
+const BLOOD_GROUPS=["A+","A-","B+","B-","AB+","AB-","O+","O-"];
+const BATCHES=Array.from({length:20},(_,i)=>`USBMC-${String(i+1).padStart(2,"0")}`);
+function formControl(h){
+  const label=displayHeader(h);
+  if(isBloodHeader(h)) return `<label><span>${esc(label)}</span><select name="field" data-header="${esc(h)}"><option value="">Select blood group</option>${BLOOD_GROUPS.map(v=>`<option value="${v}">${v}</option>`).join("")}</select></label>`;
+  if(isBatchHeader(h)) return `<label><span>${esc(label)}</span><select name="field" data-header="${esc(h)}"><option value="">Select batch</option>${BATCHES.map(v=>`<option value="${v}">${v}</option>`).join("")}</select></label>`;
+  if(isLastDonatedHeader(h)) return `<label><span>${esc(label)}</span><input name="field" data-header="${esc(h)}" type="date"></label>`;
+  return `<label><span>${esc(label)}</span><input name="field" data-header="${esc(h)}" placeholder="${esc(label)}"></label>`;
+}
 function uniqueValues(header){
   return [...new Set(db.rows.map(r=>String(r[header]??"").trim()).filter(Boolean))].sort();
 }
@@ -75,7 +87,7 @@ async function fetchFreshData(){
 
 function captureFormState(){
   const state={};
-  document.querySelectorAll('#dynamicForm input[data-header]').forEach(i=>{
+  document.querySelectorAll('#dynamicForm [data-header]').forEach(i=>{
     state[i.dataset.header]=i.value;
   });
   const pin=$("adminPin");
@@ -85,7 +97,7 @@ function captureFormState(){
 
 function restoreFormState(state){
   if(!state) return;
-  document.querySelectorAll('#dynamicForm input[data-header]').forEach(i=>{
+  document.querySelectorAll('#dynamicForm [data-header]').forEach(i=>{
     if(Object.prototype.hasOwnProperty.call(state,i.dataset.header)) i.value=state[i.dataset.header];
   });
   const pin=$("adminPin");
@@ -132,23 +144,25 @@ async function loadData(silent=false){
 function buildUI(){
   const headers=db.headers.filter(Boolean);
 
+  const bloodHeader=headers.find(isBloodHeader);
+  const bloodCount=bloodHeader ? new Set(db.rows.map(r=>String(r[bloodHeader]||"").trim()).filter(Boolean)).size : 0;
+  const donatedHeader=headers.find(isLastDonatedHeader);
+  const donatedCount=donatedHeader ? db.rows.filter(r=>String(r[donatedHeader]||"").trim()).length : 0;
   $("stats").innerHTML=`
     <div class="stat"><b>${db.rows.length}</b><span>RECORDS</span></div>
-    <div class="stat"><b>${headers.length}</b><span>COLUMNS</span></div>
-    <div class="stat"><b>${db.rows.filter(r=>Object.values(r).some(v=>/available/i.test(String(v)))).length}</b><span>AVAILABLE / STATUS MATCHES</span></div>`;
+    <div class="stat"><b>${bloodCount}</b><span>BLOOD GROUPS</span></div>
+    <div class="stat"><b>${donatedCount}</b><span>DONATION DATES</span></div>`;
 
-  const filters=headers.filter(h=>isBloodHeader(h)||isAvailabilityHeader(h)||uniqueValues(h).length<=30);
+  const filters=headers.filter(h=>isBloodHeader(h)||isBatchHeader(h)||isAvailabilityHeader(h)||uniqueValues(h).length<=30);
   $("filters").innerHTML=filters.slice(0,4).map(h=>`
     <select class="filter" data-header="${esc(h)}" onchange="renderTable()">
       <option value="">All ${esc(h)}</option>
       ${uniqueValues(h).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("")}
     </select>`).join("");
 
-  $("tableHead").innerHTML=headers.map(h=>`<th>${esc(h)}</th>`).join("")+`<th>Action</th>`;
+  $("tableHead").innerHTML=headers.map(h=>`<th>${esc(displayHeader(h))}</th>`).join("")+`<th>Action</th>`;
 
-  $("dynamicForm").innerHTML=headers.map(h=>`
-    <label><span>${esc(h)}</span><input name="field" data-header="${esc(h)}" placeholder="${esc(h)}"></label>
-  `).join("")+`
+  $("dynamicForm").innerHTML=headers.map(h=>formControl(h)).join("")+`
     <label><span>Admin PIN</span><input name="pin" id="adminPin" type="password" placeholder="Admin PIN" required></label>
     <button type="submit">Add to Google Sheet</button>`;
 
@@ -177,6 +191,9 @@ function renderTable(){
         return `<td><a class="phone" href="tel:${esc(tel)}">${esc(value)}</a></td>`;
       }
       if(isBloodHeader(h)&&value) return `<td><span class="blood">${esc(value)}</span></td>`;
+      if(isLastDonatedHeader(h)&&value){
+        return `<td>${esc(value)}</td>`;
+      }
       if(isAvailabilityHeader(h)&&value){
         const ok=/available|yes|active/i.test(String(value));
         return `<td><span class="pill ${ok?"ok":"no"}">${esc(value)}</span></td>`;
@@ -194,7 +211,7 @@ $("dynamicForm").addEventListener("submit",async e=>{
   if(API_URL.startsWith("PASTE_")){ $("formMsg").textContent="Connect the Apps Script URL first."; return; }
 
   const fields={};
-  document.querySelectorAll('#dynamicForm input[data-header]').forEach(i=>fields[i.dataset.header]=i.value.trim());
+  document.querySelectorAll('#dynamicForm [data-header]').forEach(i=>fields[i.dataset.header]=i.value.trim());
   const pin=$("adminPin").value;
 
   // Optimistic UI: show the new record immediately, before waiting for Apps Script.
