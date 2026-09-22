@@ -1,0 +1,43 @@
+DYNAMIC GOOGLE SHEET VERSION
+
+This version is designed so the website follows the Google Sheet columns.
+
+How it works:
+- Rename a column in row 1 of BloodData -> website header changes after reload.
+- Add a new column -> website adds it automatically.
+- Delete a column -> website removes it automatically.
+- Change cell values -> website reflects them after reload.
+- Add Student form is also generated from the current column names.
+- Add a new column and it will appear in the Add Student form too.
+
+IMPORTANT:
+1. Back up your current BloodData sheet before switching.
+2. Replace Code.gs in Apps Script with apps-script/Code.gs.
+3. Keep your ADMIN_PIN or change it.
+4. Save.
+5. Deploy -> Manage deployments -> Edit -> New version -> Deploy.
+6. Keep Execute as: Me; Who has access: Anyone.
+7. Copy the /exec URL.
+8. Put that URL into app.js at API_URL.
+9. Upload/replace index.html, style.css, app.js and logo.jpg in GitHub.
+10. Keep the header row (row 1) as the column names.
+
+Example:
+Name | Roll | Batch | Mobile Number | Blood Group | Available
+
+You can later add:
+Email
+Section
+Address
+Emergency Contact
+Year
+Any other field
+
+The website will create a column/form/table for it automatically.
+
+Mobile numbers matching Mobile/Phone/Contact/Telephone/Cell are clickable tel: links.
+Blood columns are styled as blood groups.
+Available/Availability/Status columns get status styling.
+
+Edit/delete:
+For maximum control, edit/delete records directly in Google Sheet. The website reads the sheet and reflects the current data after reload.

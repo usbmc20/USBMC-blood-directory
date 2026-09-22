@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UBMC Blood Directory</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><div class="brand"><img src="logo.jpg"><div><b>US-Bangla Medical College</b><small>Blood Group Directory</small></div></div>
+<button onclick="openModal()">＋ Add Student</button></header>
+<main>
+<section class="hero"><div><small>US-Bangla Medical College</small><h1>Blood Group Directory</h1><p>This website follows the columns in the Google Sheet automatically.</p></div><span>🩸</span></section>
+<div id="stats" class="stats"></div>
+<section class="panel">
+<div class="search"><input id="search" placeholder="Search anything..."><button onclick="resetFilters()">Reset</button></div>
+<div id="filters" class="filters"></div>
+<div class="head"><h3>Directory</h3><span id="count"></span></div>
+<div id="tableWrap" class="table"><table><thead><tr id="tableHead"></tr></thead><tbody id="tableBody"></tbody></table></div>
+<div id="empty" class="empty">No matching records.</div>
+<div class="notice"><b>Important:</b> Changes made in the Google Sheet are reflected automatically after the website reloads. Mobile numbers are public and clickable; publish them only with appropriate permission.</div>
+</section></main>
+<div id="modal" class="modal hide"><div class="card"><button class="x" onclick="closeModal()">×</button><h2>Add Student</h2>
+<p>The form is generated from your Google Sheet column names.</p><form id="dynamicForm"></form><p id="formMsg"></p></div></div>
+<footer>© <span id="year"></span> US-Bangla Medical College</footer>
+<script src="app.js"></script></body></html>
