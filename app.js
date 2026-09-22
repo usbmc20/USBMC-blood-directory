@@ -1,4 +1,5 @@
 const API_URL = "https://script.google.com/macros/s/AKfycbzqyAK_6qsewxkGA9F3xh8XRvrX3-nZsozhnoQiGQl2IeaedTuLxlCHZ3Sy_JlTk3pgAw/exec";
+const AUTO_SYNC_MS = 30000; // Refresh Google Sheet data every 30 seconds
 
 let db = {headers: [], rows: []};
 
@@ -26,7 +27,7 @@ function uniqueValues(header) {
   return [...new Set(db.rows.map(r => String(r[header] ?? "").trim()).filter(Boolean))].sort();
 }
 
-async function loadData() {
+async function loadData(silent = false) {
   try {
     if (API_URL.startsWith("PASTE_")) {
       db = {
@@ -43,7 +44,9 @@ async function loadData() {
     }
     buildUI();
   } catch (err) {
-    $("tableWrap").innerHTML = `<div class="error">Could not load Google Sheet data.</div>`;
+    if (!silent) {
+      $("tableWrap").innerHTML = `<div class="error">Could not load Google Sheet data.</div>`;
+    }
   }
 }
 
